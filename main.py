@@ -213,6 +213,12 @@ sequence = []
 sentence = []
 threshold = 0.4
 
+prediction_history = []
+stability_frames = 5 
+
+last_prediction_time = 0
+cooldown_seconds = 1.5
+
 cap = cv2.VideoCapture(0)
 #set mediapipe model
 with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
@@ -238,9 +244,26 @@ with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=
             print("Predicted probs:", res)
             print("Top prob:", res[np.argmax(res)])
             print("Predicted class:", actions[np.argmax(res)])
+            
+            current_time = time.time()
 
             # 3. Viz logic
-            if res[np.argmax(res)] > threshold:
+            if res[np.argmax(res)] > threshold and (current_time - last_prediction_time) > cooldown_seconds:
+                prediction_history.append(actions[np.argmax(res)])
+
+                if len(prediction_history) > stability_frames:
+                    prediction_history = prediction_history[-stability_frames:]
+                
+                if len(prediction_history) == stability_frames and len(set(prediction_history)) == 1:
+                    if len(sentence) > 0:
+                        if actions[np.argmax(res)] != sentence[-1]:
+                            sentence.append(actions[np.argmax(res)])
+                    else:
+                        sentence.append(actions[np.argmax(res)])
+                    prediction_history = []  # Reset after adding
+
+                last_prediction_time = current_time
+
                 if len(sentence) > 0:
                     if actions[np.argmax(res)] != sentence[-1]:
                         sentence.append(actions[np.argmax(res)])
